@@ -17,8 +17,10 @@
 package org.togglz.spring.boot.autoconfigure;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,7 @@ import org.togglz.core.manager.CompositeFeatureProvider;
 import org.togglz.core.manager.EnumBasedFeatureProvider;
 import org.togglz.core.manager.FeatureManager;
 import org.togglz.core.manager.FeatureManagerBuilder;
+import org.togglz.core.manager.GenericEnumBasedFeatureProvider;
 import org.togglz.core.manager.PropertyFeatureProvider;
 import org.togglz.core.repository.StateRepository;
 import org.togglz.core.repository.cache.CachingStateRepository;
@@ -90,12 +93,27 @@ public class TogglzAutoConfiguration {
 
         @Bean
         public FeatureProvider featureProvider() {
-            PropertyFeatureProvider provider = new PropertyFeatureProvider(properties.getFeatureProperties());
+            List<FeatureProvider> providers = new ArrayList<>();
+
+            if (!properties.getFeatureProperties().isEmpty()) {
+                providers.add(new PropertyFeatureProvider(properties.getFeatureProperties()));
+            }
             Class<? extends Feature>[] featureEnums = properties.getFeatureEnums();
             if (featureEnums != null && featureEnums.length > 0) {
-                return new CompositeFeatureProvider(new EnumBasedFeatureProvider(featureEnums), provider);
-            } else {
-                return provider;
+                providers.add(new EnumBasedFeatureProvider(featureEnums));
+            }
+            Class<? extends Enum<?>>[] genericEnums = properties.getGenericEnums();
+            if (genericEnums != null && genericEnums.length > 0) {
+                providers.add(new GenericEnumBasedFeatureProvider(genericEnums));
+            }
+            switch (providers.size()) {
+            case 0:
+                // as fallback, we return an empty PropertyFeatureProvider
+                return new PropertyFeatureProvider(new Properties());
+            case 1:
+                return providers.get(0);
+            default:
+                return new CompositeFeatureProvider(providers);
             }
         }
     }
